@@ -54,8 +54,11 @@ class DataLoader():
         with open(join_path(self._data_path, file_name)) as f:
             df = pd.read_csv(f)#, nrows=200000)
 
+        
+
         if self._transaction:    
             self.add_transaction_features(df)
+
         df = self.reduce_mem_usage(df)
 
         return df
@@ -96,33 +99,16 @@ def remove_correlated_columns(df, columns, target_col="isFraud", keep_corr=True)
 
     return df
 
-def encode_AG(aggregate_cols:list, 
-              groupby:list, 
-              train_df:pd.DataFrame=None, 
-              test_df:pd.DataFrame=None, 
-              aggregations=['mean', 'std'], 
-              fillna=True, 
-              usena=False
+def encode_AG( df:pd.DataFrame,
+              groupby:str, 
+              aggregate_cols:list
+             
 ):
     
-    # AGGREGATION OF aggregate_cols WITH colum in groupby FOR GIVEN STATISTICS
-    for main_column in aggregate_cols:  
-        for col in groupby:
-            for agg_type in aggregations:
-                new_col_name = main_column+'_'+col+'_'+agg_type
-                temp_df = pd.concat([train_df[[col, main_column]], test_df[[col,main_column]]])
-                if usena: temp_df.loc[temp_df[main_column]==-1,main_column] = np.nan
-                temp_df = temp_df.groupby([col])[main_column].agg([agg_type]).reset_index().rename(
-                                                        columns={agg_type: new_col_name})
+    # Compute the mean and std only for those columns
+    means = df.groupby(groupby)[aggregate_cols].transform('mean').add_suffix('_uid_mean')
+    stds = df.groupby(groupby)[aggregate_cols].transform('std').add_suffix('_uid_std')
 
-                temp_df.index = list(temp_df[col])
-                temp_df = temp_df[new_col_name].to_dict()   
-
-                train_df[new_col_name] = train_df[col].map(temp_df).astype('float32')
-                test_df[new_col_name]  = test_df[col].map(temp_df).astype('float32')
-                
-                if fillna:
-                    train_df[new_col_name].fillna(-1,inplace=True)
-                    test_df[new_col_name].fillna(-1,inplace=True)
-                
-                print("'"+new_col_name+"'",', ',end='')
+    # Concatenate the results with the original dataframe
+    df = pd.concat([df, means, stds], axis=1)
+    return df
