@@ -125,9 +125,9 @@ def main():
     model = xgb.train(params, dtrain, num_boost_round=100)
     importance = model.get_score(importance_type='gain')
 
-    model.save_model("model.json")
+    model.save_model(f"models/{args.output}")
 
-    if args.tts:
+    if args.train_test_split:
         plot_roc(y_test, y_prob)
         plot_pr(y_test, y_prob)
 
