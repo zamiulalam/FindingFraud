@@ -11,26 +11,8 @@ from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay, precision_
 
 import argparse
 sys.path.append("../source/")
-from helper_functions import *
+from FindingFraudsters.source.data_loader import *
 
-
-def loadData(transaction_path="train_transactions.csv", ID_path=None):
-
-    dl = DataLoader()
-    df = dl.load_csv(transaction_path)
-
-    if ID_path:
-        df.transaction = False
-        df_id = dl.load_csv(ID_path)
-
-        df = df.merge(df_id, how='left', left_index=True, right_index=True)
-
-
-def prune_columns(df:pd.DataFrame, columns:list, keep:bool=True):
-    if keep:
-        return df[columns]
-    else:
-        df = df.drop(columns=columns)
 
 def plot_roc(y_true, y_prob):
      
@@ -77,11 +59,12 @@ def plot_pr(y_true, y_prob):
 
 
 def main():
-    import warnings
+
     parser = argparse.ArgumentParser()
     parser.add_argument('-t', '--transaction', type=str, default='train_transactions.csv', help="path to transaction csv")
     parser.add_argument('-i', '--id', type=str, default=None, help='path to identity csv. Defaults to None')
-    parser.add_argument('--tts', type=float, default=-1, help="Train test split. Default is to train on all data")
+    parser.add_argument('-o', '--output', type=str, default='model.json', help="Name of output model including file extension. (i.e model.json)")
+    parser.add_argument('--train_test_split', type=float, default=-1, help="Train test split. Default is to train on all data")
     parser.add_argument('--tr_cols', type=str, default=None, help="Text file containing a list of variables to keep in transaction dataframe")
     parser.add_argument('--id_cols', type=str, default=None, help="Text file containing a list of variables to keep in identity dataframe")
 
@@ -91,8 +74,29 @@ def main():
     args = parser.parse_args()
     dataLoader = DataLoader()
 
-    df = dataLoader.load_csv(args.transaction, args.id, args.tr_cols, args.id_cols)
+    dataLoader.load_csv(args.transaction, args.id, args.tr_cols, args.id_cols)
+
+    # add additional features
+    dataLoader.add_transaction_features()
+    dataLoader.add_uid()
+    dataLoader.transaction_in_window()
+
+    # aggregate and frequency encoding features
+    columns_to_encode = []
+    columns_to_encode.append("TransactionAmt")
+    columns_to_encode.append("TransactionDT")
+
+    d_columns = [d for d in dataLoader.df.columns if d.startswith("D") and len(d) < 4]
+
+    columns_to_encode += d_columns
+    dataLoader.encode_AG('uid', columns_to_encode)
+
+    columns_to_encode = ["addr1", "card1", "card2", "card3", "P_emaildomain", "R_emaildomain"]
+    dataLoader.encode_FE(columns_to_encode)
+
+    df = dataLoader.df
     
+    # Prepare inputs and targets for training
     y = df["isFraud"]
     # X = df.drop(columns=["isFraud", "uid", "card1", "addr1", "D1", "TransactionID", "D1n"]) # drop items that go into uid?
     if 'uid' in set(df.columns):
@@ -105,11 +109,11 @@ def main():
                 'learning_rate': 0.12,
                 'max_depth': 12, }
 
-    if args.tts:
+    if args.train_test_split > 0:
         from sklearn.model_selection import train_test_split
         
 
-        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=args.train_test_split, random_state=42, stratify=y)
 
         dtrain = xgb.DMatrix(X_train, label=y_train) 
         dval = xgb.DMatrix(X_test, label=y_test)
