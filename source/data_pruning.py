@@ -1,7 +1,11 @@
 import pandas as pd
 import numpy as np
 
-def remove_correlated_columns(df, columns, target_col="isFraud", keep_corr=True, corr_factor=0.9):
+
+from lightgbm import LGBMClassifier
+from sklearn.metrics import roc_auc_score
+
+def remove_correlated_columns(df, columns, target_col="isFraud", keep_corr=True):
     """
     df:         pandas dataframe
     column:     list of column names to consider
@@ -33,3 +37,31 @@ def remove_correlated_columns(df, columns, target_col="isFraud", keep_corr=True,
         to_drop.add(drop_col)
 
     return to_drop
+
+
+
+def get_low_importance_v_features(train, threshold=20):
+    vfeatures = [f for f in train.columns if f.startswith("V")]
+
+    # Impute missing values using medians from train
+    train_v = train[vfeatures].fillna(train[vfeatures].median())
+
+    # Train-validation split
+    split = int(0.8 * len(train))
+    V_x, V_cv = train_v[:split], train_v[split:]
+    y_train = train["isFraud"][:split]
+    y_cv = train["isFraud"][split:]
+
+    # Train LightGBM
+    clf = LGBMClassifier()
+    clf.fit(V_x, y_train)
+
+    # AUC scores
+    print("Train AUC:", roc_auc_score(y_train, clf.predict_proba(V_x)[:, 1]))
+    print("CV AUC:", roc_auc_score(y_cv, clf.predict_proba(V_cv)[:, 1]))
+
+    # Collect low-importance features
+    Vremove = [vfeatures[i] for i, imp in enumerate(clf.feature_importances_) if imp < threshold]
+    print(f"Dropping {len(Vremove)} V-features with importance < {threshold}")
+
+    return Vremove

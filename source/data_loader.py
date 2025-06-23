@@ -1,3 +1,5 @@
+from sklearn.experimental import enable_iterative_imputer
+from sklearn.impute import IterativeImputer
 import pandas as pd
 from os.path import join as join_path
 import numpy as np
@@ -119,6 +121,20 @@ class DataLoader():
             freq = self.df[col].value_counts(normalize=True)
             self.df[col_name] = self.df[col].map(freq)
 
+    
+    def iterative_imputation(self, max_iter=10, random_state=42):
+        """
+        Impute missing values in self.df using IterativeImputer.
+        Assumes all columns are numeric or already encoded.
+        """
+        columns = self.df.columns
+        index = self.df.index
+
+        imputer = IterativeImputer(max_iter=max_iter, random_state=random_state)
+        imputed_array = imputer.fit_transform(self.df)
+
+        self.df = pd.DataFrame(imputed_array, columns=columns, index=index)
+    
     
     def load_csv(self, transaction_file=None, identity_file=None, 
                  tr_columns:str=None, id_columns:str=None):
