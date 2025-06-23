@@ -3,9 +3,12 @@ from os.path import join as join_path
 import numpy as np
 
 class DataLoader():
-    def __init__(self, transaction=True):
-        self._data_path = "../../data/"
-        self._transaction = transaction
+    def __init__(self, predict:bool=False):
+        """
+        predict: will data be used for prediction? If False, it is assumed to be used for training
+        """
+        self._data_path = ""
+        self._predict = predict
         self.df = None
 
     @property
@@ -135,6 +138,12 @@ class DataLoader():
             with open(tr_columns) as f:
                 usecols = f.readlines()
             usecols = [item.strip() for item in usecols]
+            if 'TransactionID' not in usecols:
+                usecols.append('TransactionID')
+            if not self._predict:
+                if 'isFraud' not in usecols:
+                    usecols.append('isFraud')
+
 
         # Open transaction file
         with open(join_path(self._data_path, transaction_file)) as f:
@@ -152,6 +161,8 @@ class DataLoader():
             with open(id_columns) as f:
                 usecols = f.readlines()
             usecols = [item.strip() for item in usecols]
+            if 'TransactionID' not in usecols:
+                usecols.append('TransactionID')
 
         # Read ID file
         if identity_file:

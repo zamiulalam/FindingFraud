@@ -1,12 +1,13 @@
 import pandas as pd
 import numpy as np
 
-def remove_correlated_columns(df, columns, target_col="isFraud", keep_corr=True):
+def remove_correlated_columns(df, columns, target_col="isFraud", keep_corr=True, corr_factor=0.9):
     """
     df:         pandas dataframe
     column:     list of column names to consider
     target:     the column who's final correlation we are interested in
     keep_corr:  keep only the column which is most correlated with the target. If False, keep the column with the most unique values
+    corr_factor how high correlated variables must be to consider them
     return:     List of variables to drop
     """
 
@@ -16,7 +17,7 @@ def remove_correlated_columns(df, columns, target_col="isFraud", keep_corr=True)
     # Step 2: Mask upper triangle and self-correlations
     upper = np.triu(np.ones(corr_matrix.shape), k=1).astype(bool)
     high_corr_pairs = corr_matrix.where(upper).stack()
-    high_corr_pairs = high_corr_pairs[high_corr_pairs > 0.85]
+    high_corr_pairs = high_corr_pairs[high_corr_pairs > corr_factor]
 
     # Step 3: Determine which column in each pair to drop
     to_drop = set()
