@@ -22,6 +22,7 @@ class DataLoader():
         self.str_cols: list[str] = []
         self.bool_cols: list[str] = []
 
+
     @property
     def df(self):
         return self._df
@@ -206,6 +207,7 @@ class DataLoader():
         if not isTest and 'isFraud' not in usecols:
             print(f"{TextColor.YELLOW}The columns supplied do not have isFraud column which is needed for training, adding it{TextColor.RESET}")
             usecols.append('isFraud')
+
         # Open transaction file
         with open(join_path(self._data_path, transaction_file)) as f:
 

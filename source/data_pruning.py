@@ -13,7 +13,7 @@ def remove_correlated_columns(df: pd.DataFrame, columns: list[str], target_col: 
     -----------------------------------
     df: pd.DataFrame
         The pandas dataframe to be considered for correlation analysis.
-    column: list[str]
+    columns: list[str]
         The list of column names to be considered.
     target_col: str 
         The name of the column whose correlation with other columns will determine which column to retain. 
@@ -24,6 +24,7 @@ def remove_correlated_columns(df: pd.DataFrame, columns: list[str], target_col: 
     -----------------------------------
     set[str]
         A set of columns that are to be dropped.
+
     """
 
     # Step 1: Compute correlation matrix for input features
@@ -32,7 +33,7 @@ def remove_correlated_columns(df: pd.DataFrame, columns: list[str], target_col: 
     # Step 2: Mask upper triangle and self-correlations
     upper = np.triu(np.ones(corr_matrix.shape), k=1).astype(bool)
     high_corr_pairs = corr_matrix.where(upper).stack()
-    high_corr_pairs = high_corr_pairs[high_corr_pairs > 0.85]
+    high_corr_pairs = high_corr_pairs[high_corr_pairs > corr_factor]
 
     # Step 3: Determine which column in each pair to drop
     to_drop = set()
