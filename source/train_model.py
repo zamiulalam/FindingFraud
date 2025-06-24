@@ -82,7 +82,7 @@ def main():
     parser.add_argument('--train_test_split', type=float, default=-1, help="Train test split. Default is to train on all data")
     parser.add_argument('--tr_cols', type=str, default=None, help="Text file containing a list of variables to keep in transaction dataframe")
     parser.add_argument('--id_cols', type=str, default=None, help="Text file containing a list of variables to keep in identity dataframe")
-    parser.add_argument('--predict', action='store_true', help="Make predictions instead of training")
+    parser.add_argument('--test', action='store_true', help="Test a model (instead of train) on the test dataset which does not include isFraud variable.")
     parser.add_argument('--model_type', type=str, choices=['xgboost', 'lightgbm', 'catboost'], default='xgboost', help='Model type to use')
     parser.add_argument('--gpu', action='store_true', help='Use GPU')
 
@@ -90,9 +90,9 @@ def main():
     args = parser.parse_args()
     modelSelector = ModelSelector(model_type=args.model_type, max_depth=12, n_estimators=500)
     
-    dataLoader = DataLoader(args.predict)
+    dataLoader = DataLoader()
 
-    dataLoader.load_csv(args.transaction, args.id, args.tr_cols, args.id_cols)
+    dataLoader.load_csv(args.transaction, args.id, args.tr_cols, args.id_cols, args.test)
 
     # add additional features
     dataLoader.add_transaction_features()
@@ -117,7 +117,7 @@ def main():
 
 
     
-    if args.predict:
+    if args.test:
         TransactionID = df['TransactionID']
         if 'uid' in df.columns:
             df = df.drop(columns=['TransactionID', 'uid'])
