@@ -10,12 +10,13 @@ from sklearn.ensemble import IsolationForest
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay, precision_score
 
 from source.data_loader import *
+from source.model_selector import ModelSelector
 
 def get_path(file_name):
-    models_dir = os.path.dirname(os.path.abspath(__file__))
-    models_dir = os.path.dirname(models_dir)
-    models_dir = os.path.join(models_dir, file_name)
-    return models_dir
+    return_dir = os.path.dirname(os.path.abspath(__file__))
+    return_dir = os.path.dirname(return_dir)
+    return_dir = os.path.join(return_dir, file_name)
+    return return_dir
 
 def plot_roc(y_true, y_prob, name=""):
      
@@ -82,11 +83,13 @@ def main():
     parser.add_argument('--tr_cols', type=str, default=None, help="Text file containing a list of variables to keep in transaction dataframe")
     parser.add_argument('--id_cols', type=str, default=None, help="Text file containing a list of variables to keep in identity dataframe")
     parser.add_argument('--predict', action='store_true', help="Make predictions instead of training")
+    parser.add_argument('--model_type', type=str, choices=['xgboost', 'lightgbm', 'catboost'], default='xgboost', help='Model type to use')
+    parser.add_argument('--gpu', action='store_true', help='Use GPU')
 
-    # parser.add_argument('-p', '--prune', type=str, default=None, help="Text file containing a list of variables to remove from dataframe")
-    # parser.add_argument('-k', '--keep', type=str, default=None, help="Text file containing a list of variables to keep in dataframe")
     
     args = parser.parse_args()
+    modelSelector = ModelSelector(model_type=args.model_type, max_depth=12, n_estimators=500)
+    
     dataLoader = DataLoader(args.predict)
 
     dataLoader.load_csv(args.transaction, args.id, args.tr_cols, args.id_cols)
@@ -110,15 +113,19 @@ def main():
     dataLoader.encode_FE(columns_to_encode)
 
     df = dataLoader.df
+    df = df.sort_values(by='TransactionDT', ascending=True)
+
+
     
     if args.predict:
         TransactionID = df['TransactionID']
-        df = df.drop(columns=['TransactionID', 'uid'])
-        dval = xgb.DMatrix(df)
-        model = xgb.Booster()
+        if 'uid' in df.columns:
+            df = df.drop(columns=['TransactionID', 'uid'])
+        else:
+            df = df.drop(columns=['TransactionID'])
         model_path = get_path(f"models/{args.model}")
-        model.load_model(model_path)
-        y_prob = model.predict(dval)
+        modelSelector.load_model(model_path)
+        y_prob = modelSelector.predict(df)
 
         output_df = pd.DataFrame(data=zip(TransactionID,y_prob), columns=["TransactionID", "isFraud"])
         output_path = get_path(f"outputs/predictions_{args.model}.csv")
@@ -128,41 +135,29 @@ def main():
 
 
     # Prepare inputs and targets for training
-    df = df.sort_values(by='TransactionDT', ascending=True)
-    y = df["isFraud"]
+    y_train = df["isFraud"]
     if 'uid' in set(df.columns):
-        X = df.drop(columns=["isFraud", "uid", "TransactionID"])
+        x_train = df.drop(columns=["isFraud", "uid", "TransactionID"])
     else:
-        X = df.drop(columns=["isFraud", "TransactionID"])
-
-    params = {"device":"cuda", "objective":"binary:logistic",
-                "eval_metric":"aucpr", #logloss
-                'learning_rate': 0.1,
-                'max_depth': 16, }
+        x_train = df.drop(columns=["isFraud", "TransactionID"])
 
     if args.train_test_split > 0:
         from sklearn.model_selection import train_test_split
         
-        
         # X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=args.train_test_split, random_state=402, stratify=y)
-        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=args.train_test_split, stratify=None, shuffle=False) # train and test using temporally separated data
-
-        dtrain = xgb.DMatrix(X_train, label=y_train) 
-        dval = xgb.DMatrix(X_test, label=y_test)
+        x_train, x_test, y_train, y_test = train_test_split(x_train, y_train, test_size=args.train_test_split, stratify=None, shuffle=False) # train and test using temporally separated data
     else:
-        dtrain = xgb.DMatrix(X, label=y) 
+        x_test, y_test = None, None
 
-
-    model = xgb.train(params, dtrain, num_boost_round=100)
-    importance = model.get_score(importance_type='gain')
+    modelSelector.fit(x_train, y_train, x_test, y_test)
 
     models_dir = get_path(f"models/{args.model}")
     print("Saving model to ",models_dir)
 
-    model.save_model(models_dir)
+    modelSelector.save_model(models_dir)
 
     if args.train_test_split > 0:
-        y_prob = model.predict(dval)
+        y_prob = modelSelector.predict(x_test)
         opt_threshold = plot_roc(y_test, y_prob, args.model)
         plot_pr(y_test, y_prob, args.model)
         plot_confusion_matrix(y_test, y_prob, opt_threshold, args.model)
