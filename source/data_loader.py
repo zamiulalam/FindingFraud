@@ -159,7 +159,9 @@ class DataLoader():
             if not self._predict:
                 if 'isFraud' not in usecols:
                     usecols.append('isFraud')
-
+            else:
+                if 'isFraud' in usecols:
+                    usecols.remove('isFraud')
 
         # Open transaction file
         with open(join_path(self._data_path, transaction_file)) as f:

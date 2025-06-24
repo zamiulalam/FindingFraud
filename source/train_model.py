@@ -24,6 +24,7 @@ def plot_roc(y_true, y_prob, name=""):
     optimal_idx = np.argmax(tpr - fpr)
     optimal_threshold = threshold[optimal_idx]
     roc_auc = auc(fpr, tpr)
+    print("roc auc", roc_auc, "at threshold",optimal_threshold)
 
     plt.figure()
     plt.plot(fpr, tpr, label=f'ROC curve (AUC = {roc_auc:.2f})')
@@ -47,7 +48,7 @@ def plot_pr(y_true, y_prob, name=""):
 
     roc_auc = auc(recall, precision)
     print(f"Best F1: {f1_scores[best_index]:.4f} at threshold: {optimal_threshold:.4f}")
-    print("auc", roc_auc)
+    print("auprc", roc_auc)
     plt.figure()
     plt.plot(recall,precision, label=f'ROC curve (AUPRC = {roc_auc:.2f})')
     plt.plot([0, 1], [1, 0], 'k--')  # Diagonal line
@@ -62,6 +63,12 @@ def plot_pr(y_true, y_prob, name=""):
 
     return optimal_threshold
 
+def plot_confusion_matrix(y_true, y_pred, threshold, name=""):
+    y_pred = y_pred > threshold
+    cm = confusion_matrix(y_true, y_pred)
+    disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=[0, 1])
+    output_path = get_path(f"outputs/confusion_matrix_{name}.png")
+    disp.plot(cmap='Blues').figure_.savefig(output_path)
 
 def main():
 
@@ -121,8 +128,8 @@ def main():
 
 
     # Prepare inputs and targets for training
+    df = df.sort_values(by='TransactionDT', ascending=True)
     y = df["isFraud"]
-    # X = df.drop(columns=["isFraud", "uid", "card1", "addr1", "D1", "TransactionID", "D1n"]) # drop items that go into uid?
     if 'uid' in set(df.columns):
         X = df.drop(columns=["isFraud", "uid", "TransactionID"])
     else:
@@ -130,14 +137,15 @@ def main():
 
     params = {"device":"cuda", "objective":"binary:logistic",
                 "eval_metric":"aucpr", #logloss
-                'learning_rate': 0.05,
-                'max_depth': 12, }
+                'learning_rate': 0.1,
+                'max_depth': 16, }
 
     if args.train_test_split > 0:
         from sklearn.model_selection import train_test_split
         
-
-        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=args.train_test_split, random_state=42, stratify=y)
+        
+        # X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=args.train_test_split, random_state=402, stratify=y)
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=args.train_test_split, stratify=None, shuffle=False) # train and test using temporally separated data
 
         dtrain = xgb.DMatrix(X_train, label=y_train) 
         dval = xgb.DMatrix(X_test, label=y_test)
@@ -145,18 +153,19 @@ def main():
         dtrain = xgb.DMatrix(X, label=y) 
 
 
-    model = xgb.train(params, dtrain, num_boost_round=500)
+    model = xgb.train(params, dtrain, num_boost_round=100)
     importance = model.get_score(importance_type='gain')
 
-    models_dir = get_path(f"models/{args.output}")
+    models_dir = get_path(f"models/{args.model}")
     print("Saving model to ",models_dir)
 
     model.save_model(models_dir)
 
-    if args.train_test_split:
+    if args.train_test_split > 0:
         y_prob = model.predict(dval)
-        plot_roc(y_test, y_prob)
-        plot_pr(y_test, y_prob)
+        opt_threshold = plot_roc(y_test, y_prob, args.model)
+        plot_pr(y_test, y_prob, args.model)
+        plot_confusion_matrix(y_test, y_prob, opt_threshold, args.model)
 
 if __name__ == '__main__':
 

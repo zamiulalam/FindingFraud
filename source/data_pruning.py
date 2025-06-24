@@ -5,7 +5,7 @@ import numpy as np
 from lightgbm import LGBMClassifier
 from sklearn.metrics import roc_auc_score
 
-def remove_correlated_columns(df, columns, target_col="isFraud", keep_corr=True):
+def remove_correlated_columns(df, columns, target_col="isFraud", keep_corr=True, corr_factor=0.9):
     """
     df:         pandas dataframe
     column:     list of column names to consider
