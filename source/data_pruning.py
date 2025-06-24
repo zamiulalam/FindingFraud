@@ -6,7 +6,7 @@ from lightgbm import LGBMClassifier
 from sklearn.metrics import roc_auc_score
 from sklearn.preprocessing import LabelEncoder
 
-def remove_correlated_columns(df: pd.DataFrame, columns: list[str], target_col: str = "isFraud", keep_corr: bool = True)->set[str]:
+def remove_correlated_columns(df: pd.DataFrame, columns: list[str], target_col: str = "isFraud", keep_corr: bool = True, corr_factor: float = 0.9)->set[str]:
     """Returns a set of variables to drop
 
     Parameters
@@ -19,6 +19,8 @@ def remove_correlated_columns(df: pd.DataFrame, columns: list[str], target_col: 
         The name of the column whose correlation with other columns will determine which column to retain. 
     keep_corr: bool
         Flag to keep only the column which is the most correlated column with the target. If False, keep the column with the most unique values.
+    corr_factor: float
+        How high correlated features must be to consider them
 
     Returns
     -----------------------------------
