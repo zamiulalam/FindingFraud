@@ -88,7 +88,7 @@ def main():
 
     
     args = parser.parse_args()
-    modelSelector = ModelSelector(model_type=args.model_type, max_depth=12, n_estimators=500)
+    modelSelector = ModelSelector(model_type=args.model_type, use_gpu=args.gpu, max_depth=12, n_estimators=500)
     
     dataLoader = DataLoader()
 
