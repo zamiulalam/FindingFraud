@@ -22,7 +22,7 @@ An example command to train a model:
 
 Running this will produce ROC curves, Precision-Recall ROC curves, a confusion matrix corresponding to the optimal ROC threshold, and the model output in the `output` directory
 
-The test dataset does not include the `isFraud` column. Specifying the `--predict` flag will ensure that the `isFraud` column is not read. It will also evaluate the input files and output a predictions csv which can be uploaded to kaggle. As no labels are assumed when predicting in this way, no output plots will be generated.
+The test dataset does not include the `isFraud` column. Specifying the `--test` flag will ensure that the `isFraud` column is not read. It will also evaluate the input files and output a predictions csv which can be uploaded to kaggle. As no labels are assumed when predicting in this way, no output plots will be generated.
 
 ## Contents
 Data Exploration notebooks are kept in the notebooks directory. They show the process used to filter and transform variables of interest
