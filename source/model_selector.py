@@ -8,6 +8,7 @@ from lightgbm import LGBMClassifier
 from catboost import CatBoostClassifier
 import optuna
 from typing import Type, List, Callable, Optional
+from warnings import warn
 
 class ModelSelector:
     def __init__(self, model_type: str = 'xgboost', use_gpu: bool = False, test_size: float = 0.2, random_state: int = 42, **model_params)->None:
@@ -42,18 +43,18 @@ class ModelSelector:
             }
             if self.use_gpu:
                 default_params.update({
-                    'tree_method': 'gpu_hist',
+                    'device': 'cuda',
                     'predictor': 'gpu_predictor',
-                    'gpu_id': 0
                 })
             return XGBClassifier(**default_params, **self.model_params)
 
         elif self.model_type == 'lightgbm':
             default_params = {}
             if self.use_gpu:
-                default_params.update({
-                    'device': 'gpu'
-                })
+                warn("\033[33m lightgbm does not support GPU when installed with cuda. Running CPU only\033[0m", UserWarning)
+                # default_params.update({
+                #     'device': 'gpu'
+                # })
             return LGBMClassifier(**default_params, **self.model_params)
 
         elif self.model_type == 'catboost':

@@ -4,7 +4,7 @@ import pandas as pd
 from os.path import join as join_path
 import numpy as np
 from dataclasses import dataclass
-
+from typing import Optional
 @dataclass
 class TextColor:
     RED = "\033[31m"
@@ -13,9 +13,7 @@ class TextColor:
     RESET = "\033[0m"
 
 class DataLoader():
-    def __init__(self, transaction=True):
-        self._data_path: str = "../../data/"
-        self._transaction: bool = transaction
+    def __init__(self):
         self.df: pd.DataFrame|None = None
         self.float_cols: list[str] = []
         self.int_cols: list[str] = []
@@ -211,7 +209,7 @@ class DataLoader():
             usecols.remove('isFraud')
 
         # Open transaction file
-        with open(join_path(self._data_path, transaction_file)) as f:
+        with open(transaction_file) as f:
 
             if tr_columns:
                 self.df = pd.read_csv(f, usecols=usecols)
@@ -232,7 +230,7 @@ class DataLoader():
 
         # Read ID file
         if identity_file:
-            with open(join_path(self._data_path, identity_file)) as f:
+            with open(identity_file) as f:
                 if id_columns:
                     id_df = pd.read_csv(f, usecols=usecols)
                 else:
