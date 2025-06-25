@@ -88,7 +88,8 @@ def main():
 
     
     args = parser.parse_args()
-    modelSelector = ModelSelector(model_type=args.model_type, max_depth=12, n_estimators=500)
+    modelSelector = ModelSelector(model_type=args.model_type, use_gpu=args.gpu, max_depth=12, n_estimators=500, eval_metric='aucpr', learning_rate=0.02,
+                                  subsample=0.8,colsample_bytree=0.4,early_stopping_rounds=10,missing=-999)
     
     dataLoader = DataLoader()
 
@@ -98,6 +99,7 @@ def main():
     dataLoader.add_transaction_features()
     dataLoader.add_uid()
     dataLoader.transaction_in_window()
+    dataLoader.add_key_match()
 
     # aggregate and frequency encoding features
     columns_to_encode = []
@@ -113,16 +115,18 @@ def main():
     dataLoader.encode_FE(columns_to_encode)
 
     df = dataLoader.df
+    # Ensure any columns we've added are correctly cast
+    for col in df.select_dtypes(include=['object','bool']).columns:
+            df[col], _ = pd.factorize(df[col])    
+
     df = df.sort_values(by='TransactionDT', ascending=True)
-
-
     
     if args.test:
         TransactionID = df['TransactionID']
         if 'uid' in df.columns:
-            df = df.drop(columns=['TransactionID', 'uid'])
+            df = df.drop(columns=['TransactionID', 'uid', "addr1", "D1", "D1n"])
         else:
-            df = df.drop(columns=['TransactionID'])
+            df = df.drop(columns=['TransactionID', "addr1", "D1", "D1n"])
         model_path = get_path(f"models/{args.model}")
         modelSelector.load_model(model_path)
         y_prob = modelSelector.predict(df)
@@ -137,15 +141,15 @@ def main():
     # Prepare inputs and targets for training
     y_train = df["isFraud"]
     if 'uid' in set(df.columns):
-        x_train = df.drop(columns=["isFraud", "uid", "TransactionID"])
+        x_train = df.drop(columns=["isFraud", "uid", "TransactionID", "addr1", "D1", "D1n"])
     else:
-        x_train = df.drop(columns=["isFraud", "TransactionID"])
+        x_train = df.drop(columns=["isFraud", "TransactionID", "addr1", "D1", "D1n"])
 
     if args.train_test_split > 0:
         from sklearn.model_selection import train_test_split
         
-        # X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=args.train_test_split, random_state=402, stratify=y)
-        x_train, x_test, y_train, y_test = train_test_split(x_train, y_train, test_size=args.train_test_split, stratify=None, shuffle=False) # train and test using temporally separated data
+        x_train, x_test, y_train, y_test = train_test_split(x_train, y_train, test_size=args.train_test_split, stratify=y_train)
+        # x_train, x_test, y_train, y_test = train_test_split(x_train, y_train, test_size=args.train_test_split, stratify=None, shuffle=False) # train and test using temporally separated data
     else:
         x_test, y_test = None, None
 

@@ -4,7 +4,7 @@ import pandas as pd
 from os.path import join as join_path
 import numpy as np
 from dataclasses import dataclass
-
+from typing import Optional
 @dataclass
 class TextColor:
     RED = "\033[31m"
@@ -13,9 +13,7 @@ class TextColor:
     RESET = "\033[0m"
 
 class DataLoader():
-    def __init__(self, transaction=True):
-        self._data_path: str = "../../data/"
-        self._transaction: bool = transaction
+    def __init__(self):
         self.df: pd.DataFrame|None = None
         self.float_cols: list[str] = []
         self.int_cols: list[str] = []
@@ -40,12 +38,6 @@ class DataLoader():
         for i in range(1,10):
             self.df["M"+str(i)] = self.df["M"+str(i)].astype(bool)
 
-        # Deal with categorical features
-        # trees don't care about cardinality, we can transform them all into integer codes. Some such as addr1 are already numbers
-        #categorical_vars = ["ProductCD", "card1","card2","card3","card4","card5","card6","addr1", "addr2", "P_emaildomain", "R_emaildomain"]
-        categorical_vars = ["ProductCD","card4","card6","P_emaildomain", "R_emaildomain"]
-        for cat in categorical_vars:
-            self.df[cat] = pd.factorize(self.df[cat])[0]
         
     def add_uid(self):
         """
@@ -58,31 +50,46 @@ class DataLoader():
         """
         Determines how many transactions of the same amount occur in plus/minus 500 seconds around a given transaction
         """
-        # Sort by TransactionTD
         self.df = self.df.sort_values('TransactionDT').reset_index(drop=True)
 
-        # Create an empty column
         self.df['IsDuplicateInWindow'] = 1
 
-        # Get numpy arrays for faster operations
         tds = self.df['TransactionDT'].values
         amts = self.df['TransactionAmt'].values
 
-        # Use searchsorted to find window ranges
         for i in range(len(self.df)):
             lower = tds[i] - 500
             upper = tds[i] + 500
 
-            # Find indices where TD is within ±100
+            # Find indices where TD is within ±x
             start = np.searchsorted(tds, lower, side='left')
             end = np.searchsorted(tds, upper, side='right')
 
-            # Slice the relevant window and check for other matching TransactionAmt
             window_amts = amts[start:end]
             match_count = np.sum(window_amts == amts[i])
 
             self.df.at[i, 'IsDuplicateInWindow'] = match_count
-        
+
+    def add_key_match(self):
+        """
+        Define a variable to determine if similar transactions occur in a window of +/- 50 transactions
+        """
+
+        self.df['key'] = (
+            self.df['TransactionAmt'].astype(str) + '_' +
+            self.df['ProductCD'].astype(str) + '_' +
+            self.df['card1'].astype(str)
+        )
+        key_arr = self.df['key'].values
+        match = np.zeros(len(self.df), dtype=bool)
+        for i in range(len(self.df)):
+            start = max(0, i - 50)
+            end = min(len(self.df), i + 51)
+            window = np.r_[key_arr[start:i], key_arr[i+1:end]]
+            if key_arr[i] in window:
+                match[i] = True
+        self.df['key_match'] = match
+
     def reduce_mem_usage(self):
         """
         Downcast all object types to smallest type able to represent the range in the dataset
@@ -172,6 +179,23 @@ class DataLoader():
         imputed_array = imputer.fit_transform(self.df)
 
         self.df = pd.DataFrame(imputed_array, columns=columns, index=index)
+
+    def drop_nan_columns(self, percent: float = 0.8):
+        """
+        Drop columns if more the given percent of rows are NaN
+
+        Parameters
+        -----------------------------------
+        percent: float
+
+        Returns
+        -----------------------------------
+        None
+            Modifies dataframe in place
+        """
+
+        self.df = self.df.loc[:, self.df.isnull().mean() <= percent]
+
     
     
     def load_csv(self, transaction_file: str|None = None, identity_file: Optional[str] = None, 
@@ -211,7 +235,7 @@ class DataLoader():
             usecols.remove('isFraud')
 
         # Open transaction file
-        with open(join_path(self._data_path, transaction_file)) as f:
+        with open(transaction_file) as f:
 
             if tr_columns:
                 self.df = pd.read_csv(f, usecols=usecols)
@@ -232,7 +256,7 @@ class DataLoader():
 
         # Read ID file
         if identity_file:
-            with open(join_path(self._data_path, identity_file)) as f:
+            with open(identity_file) as f:
                 if id_columns:
                     id_df = pd.read_csv(f, usecols=usecols)
                 else:
