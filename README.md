@@ -5,7 +5,7 @@ Inspired by https://arxiv.org/pdf/2208.14417 and their git repo: https://github.
 
 Useful writeup of previous analysis of dataset: https://developer.nvidia.com/blog/leveraging-machine-learning-to-detect-fraud-tips-to-developing-a-winning-kaggle-solution/
 
-## A brief description of the project: 
+## Brief Description 
 
 • Developed a fraud detection model using boosted decision trees (BDT) on the IEEE-CIS Fraud Detection dataset.
 
